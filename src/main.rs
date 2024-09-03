@@ -1,5 +1,5 @@
 use std::error::Error;
-use std::thread::{sleep, Thread};
+use std::thread::sleep;
 use std::time::Duration;
 use hidapi::{DeviceInfo, HidApi, HidDevice, HidError};
 use log::debug;
