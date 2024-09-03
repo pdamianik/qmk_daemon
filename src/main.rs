@@ -77,7 +77,7 @@ impl Filter {
 
 #[derive(Error, Debug)]
 enum VolumeError {
-    #[error("Volume has to be between 0 and 10")]
+    #[error("Volume has to be between 0 and 100")]
     InvalidVolumeError,
     #[error("Failed to interact with device: {0}")]
     ReadError(#[from] HidError),
@@ -86,7 +86,7 @@ enum VolumeError {
 }
 
 fn show_volume(device: &HidDevice, level: u8) -> Result<(), VolumeError> {
-    if level > 10 {
+    if level > 100 {
         return Err(VolumeError::InvalidVolumeError);
     }
 
@@ -116,10 +116,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         .map(|info| info.open_device(&api))
         .collect::<Result<Vec<_>, _>>()?;
 
-    for level in 0..=10 {
+    for level in 0..=100 {
         for device in &devices {
             show_volume(device, level)?;
-            sleep(Duration::from_millis(600));
+            sleep(Duration::from_millis(50));
         }
     }
 
