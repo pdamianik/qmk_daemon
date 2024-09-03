@@ -1,0 +1,10 @@
+[package]
+name = "qmk_daemon"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hidapi = "2.6.3"
+thiserror = "1.0.63"
+log = "0.4.22"
+simple_logger = "5.0.0"
