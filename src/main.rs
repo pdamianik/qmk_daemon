@@ -2,13 +2,13 @@ pub mod qmk;
 mod pipewire;
 
 use hidapi::HidApi;
-use simple_logger::SimpleLogger;
 use std::error::Error;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
-use log::debug;
+use log::{debug, LevelFilter};
+use simple_logger::SimpleLogger;
 use crate::pipewire::{listen_for_volume_change, VolumeInformation};
 use crate::qmk::{show_volume, Filter};
 
@@ -16,7 +16,7 @@ const KEYCHRON: u16 = 0x3434;
 const V3_MAX: u16 = 0x0934;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    SimpleLogger::new().init()?;
+    SimpleLogger::new().with_level(LevelFilter::Error).env().init()?;
 
     let rx = Arc::new(Mutex::<Option<VolumeInformation>>::new(None));
     let tx = Arc::clone(&rx);
