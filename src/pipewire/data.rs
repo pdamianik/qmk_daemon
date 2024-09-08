@@ -6,20 +6,21 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::rc::{Rc, Weak};
+use crate::pipewire::VolumeInformation;
 
-struct Inner<L: Fn(Option<f32>) + 'static> {
+struct Inner<L: Fn(VolumeInformation) + 'static> {
     default_sink: Option<String>,
-    volume: Option<f32>,
+    volume: VolumeInformation,
 
     volume_listener: L,
 
-    node_to_volume: HashMap<String, f32>,
+    node_to_volume: HashMap<String, (f32, bool)>,
 
     proxies_t: HashMap<u32, Box<dyn ProxyT>>,
     listeners: HashMap<u32, Vec<Box<dyn Listener>>>,
 }
 
-impl<Listener: Fn(Option<f32>) + 'static> Debug for Inner<Listener> {
+impl<Listener: Fn(VolumeInformation) + 'static> Debug for Inner<Listener> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Inner")
             .field("default_sink", &self.default_sink)
@@ -31,7 +32,7 @@ impl<Listener: Fn(Option<f32>) + 'static> Debug for Inner<Listener> {
     }
 }
 
-impl<L: Fn(Option<f32>) + 'static> Inner<L> {
+impl<L: Fn(VolumeInformation) + 'static> Inner<L> {
     fn add_listener(&mut self, metadata_id: u32, listener: impl Listener + 'static) {
         let v = self.listeners.entry(metadata_id).or_default();
         v.push(Box::new(listener));
@@ -48,11 +49,11 @@ impl<L: Fn(Option<f32>) + 'static> Inner<L> {
     }
 }
 
-pub struct Data<Listener: Fn(Option<f32>) + 'static> {
+pub struct Data<Listener: Fn(VolumeInformation) + 'static> {
     inner: Rc<RefCell<Inner<Listener>>>,
 }
 
-impl<Listener: Fn(Option<f32>) + 'static> Clone for Data<Listener> {
+impl<Listener: Fn(VolumeInformation) + 'static> Clone for Data<Listener> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -60,7 +61,7 @@ impl<Listener: Fn(Option<f32>) + 'static> Clone for Data<Listener> {
     }
 }
 
-impl<L: Fn(Option<f32>) + 'static> Data<L> {
+impl<L: Fn(VolumeInformation) + 'static> Data<L> {
     pub fn new(volume_listener: L) -> Self {
         Self {
             inner: Rc::new(RefCell::new(Inner {
@@ -111,8 +112,8 @@ impl<L: Fn(Option<f32>) + 'static> Data<L> {
         });
     }
 
-    pub fn set_volume_for_node(&self, node: String, volume: f32) {
-        self.inner.borrow_mut().node_to_volume.insert(node.clone(), volume);
+    pub fn set_volume_for_node(&self, node: String, volume: f32, muted: bool) {
+        self.inner.borrow_mut().node_to_volume.insert(node.clone(), (volume, muted));
         if Some(node) == self.inner.borrow().default_sink {
             self.check_default_sink();
         }
@@ -169,11 +170,11 @@ impl<L: Fn(Option<f32>) + 'static> Data<L> {
     }
 }
 
-pub struct DataWeak<Listener: Fn(Option<f32>) + 'static> {
+pub struct DataWeak<Listener: Fn(VolumeInformation) + 'static> {
     inner: Weak<RefCell<Inner<Listener>>>,
 }
 
-impl<Listener: Fn(Option<f32>) + 'static> DataWeak<Listener> {
+impl<Listener: Fn(VolumeInformation) + 'static> DataWeak<Listener> {
     pub fn upgrade(&self) -> Option<Data<Listener>> {
         if let Some(inner) = self.inner.upgrade() {
             Some(Data {

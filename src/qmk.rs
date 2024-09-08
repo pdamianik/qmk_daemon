@@ -14,7 +14,9 @@ const CUSTOM_PROTOCOL_ID: u8 = 'A' as u8;
 enum Command {
     SetVolume {
         #[allow(dead_code)]
-        volume: u8
+        volume: u8,
+        #[allow(dead_code)]
+        muted: bool,
     } = 0x01,
 }
 
@@ -79,12 +81,12 @@ pub enum VolumeError {
     Unsuccessful,
 }
 
-pub fn show_volume(device: &HidDevice, level: u8) -> Result<(), VolumeError> {
+pub fn show_volume(device: &HidDevice, level: u8, muted: bool) -> Result<(), VolumeError> {
     if level > 100 {
         return Err(VolumeError::InvalidVolumeError);
     }
 
-    let packet: Packet = Command::SetVolume { volume: level }.into();
+    let packet: Packet = Command::SetVolume { volume: level, muted }.into();
     let data = unsafe{packet.data};
     debug!("Sending {data:?} to device {:#?}", device.get_device_info()?.path());
     device.write(&data)?;

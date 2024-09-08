@@ -1,18 +1,21 @@
 use std::error::Error;
 use std::rc::Rc;
 use json::JsonValue;
+use log::{error, warn};
 use pw::metadata::Metadata;
 use pw::node::Node;
 use pw::types::ObjectType;
 use spa::param::ParamType;
 use spa::pod::deserialize::PodDeserializer;
 use spa::pod::{Value, ValueArray};
-use spa::sys::SPA_PROP_channelVolumes;
+use spa::sys::{SPA_PROP_channelVolumes, SPA_PROP_mute};
 
 pub mod data;
 use data::Data;
 
-pub fn listen_for_volume_change(volume_listener: impl Fn(Option<f32>) + 'static) -> Result<(), Box<dyn Error>> {
+pub type VolumeInformation = Option<(f32, bool)>;
+
+pub fn listen_for_volume_change(volume_listener: impl Fn(VolumeInformation) + 'static) -> Result<(), Box<dyn Error>> {
     pw::init();
     let main_loop = pw::main_loop::MainLoop::new(None)?;
 
@@ -44,7 +47,7 @@ pub fn listen_for_volume_change(volume_listener: impl Fn(Option<f32>) + 'static)
         core.add_listener_local()
             .done(move |_id, _seq| {})
             .error(move |id, seq, res, message| {
-                eprintln!("error id:{} seq:{} res:{}: {}", id, seq, res, message);
+                error!("error id:{} seq:{} res:{}: {}", id, seq, res, message);
 
                 if id == 0 {
                     if let Some(main_loop) = main_loop_weak.upgrade() {
@@ -83,7 +86,7 @@ pub fn listen_for_volume_change(volume_listener: impl Fn(Option<f32>) + 'static)
                                                             .expect("default audio sink name is not a string")
                                                             .to_string()
                                                     } else {
-                                                        panic!("default audio sink data is not an object")
+                                                        panic!("default audio sink data is not a json object")
                                                     };
                                                     if let Some(data) = data.upgrade() {
                                                         data.set_default_sink(name);
@@ -100,6 +103,7 @@ pub fn listen_for_volume_change(volume_listener: impl Fn(Option<f32>) + 'static)
                         }
                         ObjectType::Node => {
                             let node: Node = registry.bind(obj).unwrap();
+                            let node_id = obj.id;
                             if let Some(Some(name)) = obj.props.map(|props| if props.get("device.id").is_some() { props.get("node.name") } else { None }) {
                                 let node_listener = {
                                     let name = name.to_string();
@@ -111,20 +115,40 @@ pub fn listen_for_volume_change(volume_listener: impl Fn(Option<f32>) + 'static)
                                                     .expect("could not construct deserializer for pod");
                                                 match value {
                                                     Value::Object(object) => {
+                                                        let mut volume = None;
+                                                        let mut muted = None;
                                                         for property in object.properties {
                                                             if property.key == SPA_PROP_channelVolumes {
-                                                                match property.value {
+                                                                match &property.value {
                                                                     Value::ValueArray(ValueArray::Float(array)) => {
-                                                                        if let Some(data) = data.upgrade() {
-                                                                            data.set_volume_for_node(name.clone(), array[0]);
-                                                                        }
+                                                                            volume = Some(array[0]);
                                                                     },
-                                                                    _ => eprintln!("channel volumes are not a float array"),
+                                                                    _ => error!("channel volumes are not a float array"),
+                                                                }
+                                                            }
+                                                            if property.key == SPA_PROP_mute {
+                                                                match &property.value {
+                                                                    Value::Bool(status) =>  {
+                                                                        muted = Some(*status);
+                                                                    },
+                                                                    _ => error!("channel mute is not a bool"),
                                                                 }
                                                             }
                                                         }
+                                                        match (data.upgrade(), volume, muted) {
+                                                            (Some(data), Some(volume), Some(muted)) => {
+                                                                data.set_volume_for_node(name.clone(), volume, muted);
+                                                            },
+                                                            (_, None, _) => {
+                                                                warn!("no channel volumes for node {node_id}");
+                                                            },
+                                                            (_, _, None) => {
+                                                                warn!("no muted status for node {node_id}");
+                                                            },
+                                                            _ => (),
+                                                        }
                                                     }
-                                                    _ => eprintln!("node parameter is not an object"),
+                                                    _ => error!("node parameter is not an object"),
                                                 }
                                             }
                                         })
