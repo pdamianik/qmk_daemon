@@ -11,3 +11,4 @@ simple_logger = "5.0.0"
 pw = { package = "pipewire", version = "0.8.0" }
 spa = { package = "libspa", version = "0.8.0" }
 json = "0.12.4"
+single_value_channel = "1.2.2"
