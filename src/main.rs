@@ -4,7 +4,7 @@ mod pipewire;
 use hidapi::HidApi;
 use simple_logger::SimpleLogger;
 use std::error::Error;
-use std::sync::mpsc::{sync_channel, TrySendError};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
@@ -18,7 +18,8 @@ const V3_MAX: u16 = 0x0934;
 fn main() -> Result<(), Box<dyn Error>> {
     SimpleLogger::new().init()?;
 
-    let (tx, rx) = sync_channel::<VolumeInformation>(1);
+    let rx = Arc::new(Mutex::<Option<VolumeInformation>>::new(None));
+    let tx = Arc::clone(&rx);
 
     thread::spawn(move || {
         let mut api = HidApi::new().unwrap();
@@ -29,7 +30,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             .collect::<Result<Vec<_>, _>>().unwrap();
 
         loop {
-            if let Some((volume, muted)) = rx.recv().unwrap() {
+            let value = rx.lock().unwrap().take();
+            if let Some(Some((volume, muted))) = value {
                 let level = (volume.powf(1.0 / 4.0) * 100.0) as u8;
                 debug!("level: {}", volume.powf(1.0/4.0));
                 for device in &devices {
@@ -41,9 +43,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
 
     listen_for_volume_change(move |volume| {
-        match tx.try_send(volume) {
-            Err(TrySendError::Full(_value)) => (),
-            value => value.unwrap(),
-        }
+        tx.lock().unwrap().replace(volume);
     })
 }
