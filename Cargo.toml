@@ -8,3 +8,6 @@ hidapi = "2.6.3"
 thiserror = "1.0.63"
 log = "0.4.22"
 simple_logger = "5.0.0"
+pw = { package = "pipewire", version = "0.8.0" }
+spa = { package = "libspa", version = "0.8.0" }
+json = "0.12.4"
