@@ -139,10 +139,12 @@ impl<L: Fn(Option<f32>) + 'static> Data<L> {
     fn track_any(&self, proxy_t: impl ProxyT + 'static, listener: Option<impl Listener + 'static>, on_remove: impl Fn() + 'static) {
         let proxy_id = self.track_proxy(&proxy_t, on_remove);
 
-        let mut inner = self.inner.borrow_mut();
-        inner.proxies_t.insert(proxy_id, Box::new(proxy_t));
-        if let Some(listener) = listener {
-            inner.add_listener(proxy_id, listener);
+        {
+            let mut inner = self.inner.borrow_mut();
+            inner.proxies_t.insert(proxy_id, Box::new(proxy_t));
+            if let Some(listener) = listener {
+                inner.add_listener(proxy_id, listener);
+            }
         }
     }
 

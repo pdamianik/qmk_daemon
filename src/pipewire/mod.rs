@@ -67,34 +67,36 @@ pub fn listen_for_volume_change(volume_listener: impl Fn(Option<f32>) + 'static)
                     match obj.type_ {
                         ObjectType::Metadata => {
                             let metadata: Metadata = registry.bind(obj).unwrap();
-
-                            let listener_metadata = {
-                                let data = data.downgrade();
-                                metadata.add_listener_local()
-                                    .property(move |_subject, key, type_, value| {
-                                        if key == Some("default.audio.sink") && type_ == Some("Spa:String:JSON") {
-                                            if let Some(json_object) = value {
-                                                let value = json::parse(json_object).expect("failed to parse default audio sink json data");
-                                                let name = if let JsonValue::Object(object) = value {
-                                                    object.get("name")
-                                                        .expect("default audio sink object does not contain name")
-                                                        .as_str()
-                                                        .expect("default audio sink name is not a string")
-                                                        .to_string()
-                                                } else {
-                                                    panic!("default audio sink data is not an object")
-                                                };
-                                                if let Some(data) = data.upgrade() {
-                                                    data.set_default_sink(name);
+                            let metadata_name = obj.props.map(|props| props.get("metadata.name"));
+                            if metadata_name.is_some_and(|name| name.is_some_and(|name| name == "default")) {
+                                let listener_metadata = {
+                                    let data = data.downgrade();
+                                    metadata.add_listener_local()
+                                        .property(move |_subject, key, type_, value| {
+                                            if key == Some("default.audio.sink") && type_ == Some("Spa:String:JSON") {
+                                                if let Some(json_object) = value {
+                                                    let value = json::parse(json_object).expect("failed to parse default audio sink json data");
+                                                    let name = if let JsonValue::Object(object) = value {
+                                                        object.get("name")
+                                                            .expect("default audio sink object does not contain name")
+                                                            .as_str()
+                                                            .expect("default audio sink name is not a string")
+                                                            .to_string()
+                                                    } else {
+                                                        panic!("default audio sink data is not an object")
+                                                    };
+                                                    if let Some(data) = data.upgrade() {
+                                                        data.set_default_sink(name);
+                                                    }
                                                 }
                                             }
-                                        }
-                                        0
-                                    })
-                                    .register()
-                            };
+                                            0
+                                        })
+                                        .register()
+                                };
 
-                            data.track_metadata(metadata, listener_metadata);
+                                data.track_metadata(metadata, listener_metadata);
+                            }
                         }
                         ObjectType::Node => {
                             let node: Node = registry.bind(obj).unwrap();
