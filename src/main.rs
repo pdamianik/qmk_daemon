@@ -4,7 +4,7 @@ mod pipewire;
 use hidapi::HidApi;
 use simple_logger::SimpleLogger;
 use std::error::Error;
-use std::sync::mpsc::channel;
+use std::sync::mpsc::{sync_channel, TrySendError};
 use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
@@ -18,7 +18,7 @@ const V3_MAX: u16 = 0x0934;
 fn main() -> Result<(), Box<dyn Error>> {
     SimpleLogger::new().init()?;
 
-    let (tx, rx) = channel::<VolumeInformation>();
+    let (tx, rx) = sync_channel::<VolumeInformation>(1);
 
     thread::spawn(move || {
         let mut api = HidApi::new().unwrap();
@@ -41,6 +41,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
 
     listen_for_volume_change(move |volume| {
-        tx.send(volume).unwrap();
+        match tx.try_send(volume) {
+            Err(TrySendError::Full(_value)) => (),
+            value => value.unwrap(),
+        }
     })
 }
