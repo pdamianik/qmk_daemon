@@ -6,7 +6,7 @@ const USAGE_PAGE: u16 = 0xFF60;
 const USAGE: u16 = 0x61;
 const REPORT_LENGTH: usize = 32;
 
-const CUSTOM_PROTOCOL_ID: u8 = 'A' as u8;
+const CUSTOM_PROTOCOL_ID: u8 = b'A';
 
 #[repr(u8)]
 #[repr(C)]
@@ -41,7 +41,7 @@ impl From<Command> for Packet {
                 empty: 0x00,
                 protocol: CUSTOM_PROTOCOL_ID,
                 command,
-            }
+            },
         }
     }
 }
@@ -59,15 +59,17 @@ pub enum Filter {
 
 impl Filter {
     pub fn filter(self) -> impl Fn(&&DeviceInfo) -> bool {
-        move |info|
-            info.usage_page() == USAGE_PAGE &&
-                info.usage() == USAGE &&
-                match self {
+        move |info| {
+            info.usage_page() == USAGE_PAGE
+                && info.usage() == USAGE
+                && match self {
                     Filter::None => true,
                     Filter::Vendor(vendor_id) => info.vendor_id() == vendor_id,
-                    Filter::Product(vendor_id, product_id) =>
-                        info.vendor_id() == vendor_id && info.product_id() == product_id,
+                    Filter::Product(vendor_id, product_id) => {
+                        info.vendor_id() == vendor_id && info.product_id() == product_id
+                    }
                 }
+        }
     }
 }
 
@@ -86,20 +88,29 @@ pub fn show_volume(device: &HidDevice, level: u8, muted: bool) -> Result<(), Vol
         return Err(VolumeError::InvalidVolumeError);
     }
 
-    let packet: Packet = Command::SetVolume { volume: level, muted }.into();
-    let data = unsafe{packet.data};
-    debug!("Sending {data:?} to device {:#?}", device.get_device_info()?.path());
+    let packet: Packet = Command::SetVolume {
+        volume: level,
+        muted,
+    }
+    .into();
+    let data = unsafe { packet.data };
+    debug!(
+        "Sending {data:?} to device {:#?}",
+        device.get_device_info()?.path()
+    );
     device.write(&data)?;
 
     let mut response = [0x00; REPORT_LENGTH];
     device.read(&mut response)?;
 
-    debug!("Received {response:?} from device {:#?}", device.get_device_info()?.path());
+    debug!(
+        "Received {response:?} from device {:#?}",
+        device.get_device_info()?.path()
+    );
 
     if response[0] != 0x01 {
         return Err(VolumeError::Unsuccessful);
     }
 
     Ok(())
-
 }

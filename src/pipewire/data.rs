@@ -1,3 +1,4 @@
+use crate::pipewire::VolumeInformation;
 use pw::metadata::{Metadata, MetadataListener};
 use pw::node::{Node, NodeListener};
 use pw::proxy::{Listener, ProxyT};
@@ -6,7 +7,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::rc::{Rc, Weak};
-use crate::pipewire::VolumeInformation;
 
 struct Inner<L: Fn(VolumeInformation) + 'static> {
     default_sink: Option<String>,
@@ -26,7 +26,14 @@ impl<Listener: Fn(VolumeInformation) + 'static> Debug for Inner<Listener> {
             .field("default_sink", &self.default_sink)
             .field("volume", &self.volume)
             .field("node_to_volume", &self.node_to_volume)
-            .field("proxies_t", &self.proxies_t.iter().map(|(id, proxy_t)| format!("{id}: {:?}", proxy_t.upcast_ref().get_type())).collect::<Vec<_>>())
+            .field(
+                "proxies_t",
+                &self
+                    .proxies_t
+                    .iter()
+                    .map(|(id, proxy_t)| format!("{id}: {:?}", proxy_t.upcast_ref().get_type()))
+                    .collect::<Vec<_>>(),
+            )
             .field("listeners", &self.listeners.len())
             .finish()
     }
@@ -73,13 +80,13 @@ impl<L: Fn(VolumeInformation) + 'static> Data<L> {
 
                 proxies_t: HashMap::new(),
                 listeners: HashMap::new(),
-            }))
+            })),
         }
     }
 
     pub fn downgrade(&self) -> DataWeak<L> {
         DataWeak {
-            inner: Rc::downgrade(&self.inner)
+            inner: Rc::downgrade(&self.inner),
         }
     }
 
@@ -113,7 +120,10 @@ impl<L: Fn(VolumeInformation) + 'static> Data<L> {
     }
 
     pub fn set_volume_for_node(&self, node: String, volume: f32, muted: bool) {
-        self.inner.borrow_mut().node_to_volume.insert(node.clone(), (volume, muted));
+        self.inner
+            .borrow_mut()
+            .node_to_volume
+            .insert(node.clone(), (volume, muted));
         if Some(node) == self.inner.borrow().default_sink {
             self.check_default_sink();
         }
@@ -137,7 +147,12 @@ impl<L: Fn(VolumeInformation) + 'static> Data<L> {
         }
     }
 
-    fn track_any(&self, proxy_t: impl ProxyT + 'static, listener: Option<impl Listener + 'static>, on_remove: impl Fn() + 'static) {
+    fn track_any(
+        &self,
+        proxy_t: impl ProxyT + 'static,
+        listener: Option<impl Listener + 'static>,
+        on_remove: impl Fn() + 'static,
+    ) {
         let proxy_id = self.track_proxy(&proxy_t, on_remove);
 
         {
@@ -165,7 +180,9 @@ impl<L: Fn(VolumeInformation) + 'static> Data<L> {
             })
             .register();
 
-        self.inner.borrow_mut().add_listener(proxy_id, proxy_listener);
+        self.inner
+            .borrow_mut()
+            .add_listener(proxy_id, proxy_listener);
         proxy_id
     }
 }
@@ -176,12 +193,6 @@ pub struct DataWeak<Listener: Fn(VolumeInformation) + 'static> {
 
 impl<Listener: Fn(VolumeInformation) + 'static> DataWeak<Listener> {
     pub fn upgrade(&self) -> Option<Data<Listener>> {
-        if let Some(inner) = self.inner.upgrade() {
-            Some(Data {
-                inner
-            })
-        } else {
-            None
-        }
+        self.inner.upgrade().map(|inner| Data { inner })
     }
 }

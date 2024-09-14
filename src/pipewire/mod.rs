@@ -1,5 +1,3 @@
-use std::error::Error;
-use std::rc::Rc;
 use json::JsonValue;
 use log::{error, warn};
 use pw::metadata::Metadata;
@@ -9,32 +7,40 @@ use spa::param::ParamType;
 use spa::pod::deserialize::PodDeserializer;
 use spa::pod::{Value, ValueArray};
 use spa::sys::{SPA_PROP_channelVolumes, SPA_PROP_mute};
+use std::error::Error;
+use std::rc::Rc;
 
 pub mod data;
 use data::Data;
 
 pub type VolumeInformation = Option<(f32, bool)>;
 
-pub fn listen_for_volume_change(volume_listener: impl Fn(VolumeInformation) + 'static) -> Result<(), Box<dyn Error>> {
+pub fn listen_for_volume_change(
+    volume_listener: impl Fn(VolumeInformation) + 'static,
+) -> Result<(), Box<dyn Error>> {
     pw::init();
     let main_loop = pw::main_loop::MainLoop::new(None)?;
 
     let _sig_int = {
         let main_loop_weak = main_loop.downgrade();
-        main_loop.loop_().add_signal_local(pw::loop_::Signal::SIGINT, move || {
-            if let Some(main_loop) = main_loop_weak.upgrade() {
-                main_loop.quit();
-            }
-        })
+        main_loop
+            .loop_()
+            .add_signal_local(pw::loop_::Signal::SIGINT, move || {
+                if let Some(main_loop) = main_loop_weak.upgrade() {
+                    main_loop.quit();
+                }
+            })
     };
 
     let _sig_term = {
         let main_loop_weak = main_loop.downgrade();
-        main_loop.loop_().add_signal_local(pw::loop_::Signal::SIGTERM, move || {
-            if let Some(main_loop) = main_loop_weak.upgrade() {
-                main_loop.quit();
-            }
-        })
+        main_loop
+            .loop_()
+            .add_signal_local(pw::loop_::Signal::SIGTERM, move || {
+                if let Some(main_loop) = main_loop_weak.upgrade() {
+                    main_loop.quit();
+                }
+            })
     };
 
     let context = pw::context::Context::new(&main_loop)?;
