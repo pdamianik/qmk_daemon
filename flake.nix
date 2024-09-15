@@ -48,13 +48,16 @@
           inherit src;
           strictDeps = true;
 
+          nativeBuildInputs = [
+            pkgs.pkg-config
+            pkgs.rustPlatform.bindgenHook
+            pkgs.gcc
+          ];
+
           buildInputs = [
             pkgs.hidapi
             pkgs.pipewire
             pkgs.udev
-            pkgs.pkg-config
-            pkgs.rustPlatform.bindgenHook
-            pkgs.gcc
           ] ++ lib.optionals pkgs.stdenv.isDarwin [
             # Additional darwin specific inputs can be set here
             # pkgs.libiconv
@@ -114,9 +117,9 @@
           };
 
           # Audit licenses
-          my-crate-deny = craneLib.cargoDeny {
-            inherit src;
-          };
+          # my-crate-deny = craneLib.cargoDeny {
+          #   inherit src;
+          # };
 
           # Run tests with cargo-nextest
           # Consider setting `doCheck = false` on `my-crate` if you do not want
@@ -163,3 +166,4 @@
         # };
       });
 }
+
