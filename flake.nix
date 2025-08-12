@@ -19,10 +19,10 @@
       flake = false;
     };
 
-    nil-lsp.url = "github:oxalica/nil";
+    # nil-lsp.url = "github:oxalica/nil";
   };
 
-  outputs = { self, nixpkgs, crane, fenix, flake-utils, advisory-db, nil-lsp, ... }:
+  outputs = { self, nixpkgs, crane, fenix, flake-utils, advisory-db, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
@@ -139,6 +139,36 @@
           });
         };
 
+        nixosModules = {
+          default = { lib, config, ... }: 
+          let cfg = config.services.qmk_daemon; in {
+            options.services.qmk_daemon = {
+              enable = lib.mkEnableOption "Enables the qmk daemon systemd service";
+              package = lib.mkOption {
+                type = lib.types.package;
+                default = self.packages.${system}.default;
+                description = "The qmk daemon package";
+              };
+            };
+            config = {
+              hardware.keyboard.qmk.enable = true;
+              systemd.user.services.qmk-daemon = {
+                enable = true;
+                after = [ "pipewire.service" ];
+                wantedBy = [ "default.target" ];
+                description = "Sends volume information to qmk keyboards";
+                environment = {
+                  "RUST_LOG" = "debug";
+                };
+                serviceConfig = {
+                  Type = "simple";
+                  ExecStart = ''${cfg.package}/bin/qmk_daemon'';
+                };
+              };
+            };
+          };
+        };
+
         apps.default = flake-utils.lib.mkApp {
           drv = my-crate;
         };
@@ -155,7 +185,7 @@
             # pkgs.ripgrep
             # pkgs.rust-analyzer
 #            fenix.packages.${system}.stable.toolchain
-            nil-lsp.packages.x86_64-linux.nil
+            # nil-lsp.packages.x86_64-linux.nil
 #            pkgs.clippy
           ];
         };
