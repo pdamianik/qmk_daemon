@@ -143,7 +143,6 @@
           default = { lib, config, ... }: 
           let cfg = config.services.qmk_daemon; in {
             options.services.qmk_daemon = {
-              enable = lib.mkEnableOption "Enables the qmk daemon systemd service";
               package = lib.mkOption {
                 type = lib.types.package;
                 default = self.packages.${system}.default;
